@@ -8,8 +8,8 @@
 
 
 // Time in ms for certain delays
-#define PICKUP_BUFFER 3000
-#define DROP_BUFFER 3000
+#define PICKUP_BUFFER 5000
+#define DROP_BUFFER 5000
 
 // Angles in degrees for the servo - Change as needed
 #define OPEN 180
@@ -28,19 +28,23 @@
 #define DISTANCE_SIZE 6
 
 // Claw distance thresholds - Change as needed
-#define PICKUP_THRESHOLD 15
-#define DROP_THRESHOLD 15
+#define PICKUP_THRESHOLD 5
+#define DROP_THRESHOLD 5
 #define MAX_DISTANCE 200
 #define MIN_DISTANCE 0 
 
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+Servo myservo;
+
 // Global variables
 int distances[DISTANCE_SIZE] = {0};
-int state = INITAL;
+int state = INITIAL;
 unsigned long thresholdTime = 0;
-int initalCount = 0;
+int initialCount = 0;
 
 void setup() {
-  Serial.begin(9600)
+  Serial.begin(9600);
 
   // Sonar & servo setup
   pinMode(ECHO_PIN, INPUT);
@@ -58,29 +62,36 @@ void setup() {
 void loop() {
   // Get current distance and time
   int currentDistance = moving_avg(sonar.ping_cm());
+  Serial.println(currentDistance);
   unsigned long currentTime = millis();
 
   if(currentTime >= thresholdTime){
     switch(state){
-      case INITAL:
+      case INITIAL:
         initialCount++;
-        if(initalCount >= DISTANCE_SIZE){
+        if(initialCount >= DISTANCE_SIZE){
           state = PICKUP;
         }
+        Serial.println("Done calibrating");
+        break;
 
       case PICKUP:
         if(currentDistance <= PICKUP_THRESHOLD){
-          myservo.write(close);
+          myservo.write(CLOSE);
           thresholdTime = currentTime + PICKUP_BUFFER;
           state = DROP;
+          Serial.println("Picking up");
         }
+        break;
 
       case DROP:
         if(currentDistance <= DROP_THRESHOLD){
-          myservo.write(open);
+          myservo.write(OPEN);
           thresholdTime = currentTime + DROP_BUFFER;
           state = PICKUP;
+          Serial.println("Dropping");
         }
+        break;
     }
   }
   
@@ -90,10 +101,12 @@ void loop() {
 
 // Moving average function, prevents false positives & reduce noise
 int moving_avg(int val){
+  
   // If the distance is 0, that means it is out of the servo's range: set to its max distance
-  if(val == MIN_DISTANCE){
-    val = MAX_DISTANCE;
+  if(val == 0){
+    val = 200;
   }
+  Serial.println(val);
 
   // Get the sum of DISTANCE_SIZE samples. 
   int average = val;
@@ -103,7 +116,7 @@ int moving_avg(int val){
     distances[i-1] = distances[i];
   }
 
-  distances[i-1] = val;
+  distances[DISTANCE_SIZE - 1] = val;
 
-  return average / DISTANCE_SIZE;
+  return (float) average / DISTANCE_SIZE;
 }
